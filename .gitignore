@@ -1,0 +1,29 @@
+# ─────────── Python byte-code ───────────
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+
+# ─────────── Virtual environments ───────
+.venv/
+env/
+venv/
+
+# ─────────── Build & packaging ──────────
+dist/
+build/
+*.egg-info/
+*.egg
+*.whl
+
+# ─────────── Test / coverage artifacts ──
+.coverage
+.pytest_cache/
+
+# ─────────── Editor / IDE metadata ──────
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
