@@ -1,3 +1,78 @@
+# Link Prediction Dataset Builder
+
+Turn raw graphs into model-ready train/test DataFrames with consistent topology features and cross-validation splits. Heavy features (PyTorch + SciPy + igraph) are used when available; otherwise a lightweight NetworkX backend is used automatically.
+
+## Scenarios
+
+### 1) Simulation (⛳)
+Given `G=(V,E)`:
+1. Build **observed** graph `G'=(V,E')` by subsampling `obs_frac` of edges with connectivity preserved (bridges are kept, then union-find spans, then densify).
+2. **Test** set uses positives `Y = E \ E'` and sampled negatives from `G` (avoid true edges). Features computed **on `G'`**.
+3. Build **training** graph `G''=(V,E'')` by subsampling `train_frac` of `E'`.
+4. **Train** set uses positives `Y' = E' \ E''` and sampled negatives from `G'`. Features computed **on `G''`**.
+5. Stratified K-Fold CV built on the train set (`n_folds`, `use_stratified_cv`).
+
+### 2) Edge Discovery
+- **Test**: sample up to `max_negative_samples` non-edges from `G` (unlabeled for scoring) with features **on `G`**.
+- **Train**: build `G'` like above; positives `E \ E'` + negatives from `G`; features **on `G'`**.
+- CV like Simulation.
+
+### 3) Specific Edge Prediction
+- **Test**: user-provided pairs (unlabeled) with features **on `G`**.
+- **Train**: same as Discovery’s training. We avoid using any user target pairs as negatives.
+
+## Connectivity-Preserving Observed Edges
+
+We preserve connectivity per component when constructing `E'` and `E''`:
+1. Include **all bridges** of the current graph.
+2. Use **Union-Find** to add non-bridges until each component has a spanning forest.
+3. **Densify** with additional non-bridges until the target size is reached.
+
+If the requested size is too small to preserve connectivity, we raise with a clear message.
+
+## Negative Sampling
+
+Uniformly sample non-edges, avoiding any specified edges (e.g., true edges and user targets).  
+If you request more than available, we return **as many as possible** by default; set `enforce_exact=True` to raise instead.
+
+## Features
+
+- **Heavy backend** (`features.py`): node centralities via igraph, pairwise topological measures, and SVD/LRA family via SciPy + PyTorch.  
+- **Light backend** (`features_light.py`): NetworkX-only alternatives for common features; SVD and igraph-only features are disabled.
+- Feature toggles can be controlled via a YAML file or left to sensible defaults.
+
+Your pipeline calls a single API:  
+`compute_all_features(G, uv_df, feature_config_path=None)`  
+and automatically picks heavy vs light.
+
+## Output Format
+
+Each `prepare_dataset(scenario, ...)` returns:
+
+```python
+results = {
+  "df_tr_top": <train DataFrame>,
+  "df_ho_top": <test DataFrame>,
+  "cv_folds":  [(train_idx, valid_idx), ...],
+  "graphs":    {"original": G, "observed": G_prime_or_None, "training": G_dprime_or_None},
+  "edge_lists":{"training_edges": [...], "observed_edges": [...],
+                "holdout_missing": Y, "training_missing": Y_prime},
+  "feature_info": {
+    "n_features": <int>,
+    "feature_names": [...],
+    "computation_graph": "training" | "observed_or_original"
+  },
+  "metadata": {
+    "execution_time": <seconds>,
+    "stage_times": {"edge_splitting": ..., "cv_folds": ...},
+    "configuration": {obs_frac, train_frac, n_folds, ...},
+    "graph_properties": {"original_is_connected": bool, "original_connected_components": int},
+    "dataset_statistics": {"training": {...}, "holdout": {...}}
+  }
+}
+
+
+
 # 🚀 Link Prediction System
 
 > A production-ready, end-to-end link prediction framework with advanced data leakage prevention and adaptive performance optimization.
