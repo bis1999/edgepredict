@@ -1,1 +1,27 @@
-# feature.yaml
+# Turn on most useful classical features; still keep the heavy ones off by default
+triangles: true
+clustering: true
+pagerank: true
+betweenness: true   # often slow; enable only if needed
+closeness: true
+eigenvector: true
+degree_centrality: true
+
+common_neighbors: true
+preferential_attachment: true
+jaccard_coefficient: true
+adamic_adar: true
+resource_allocation: true
+lhn_index: true
+shortest_paths: true  # set true AND enable_shortest_paths in code to use
+
+svd_dot: true         # set true and svd_rank>0 to enable
+svd_mean: true
+lra: true
+dlra: true
+mlra: true
+lra_approx: true
+dlra_approx: true
+mlra_approx: true
+deg_cent_u: true
+deg_cent_v: true
