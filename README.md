@@ -1,6 +1,157 @@
 # Link Prediction Framework
 
 A comprehensive machine learning framework for graph link prediction that supports multiple scenarios, feature extraction methods, and both traditional ML and Graph Neural Network (GNN) approaches.
+Core ideas & logic
+1) Scenarios
+
+We support three evaluation scenarios, each mirroring a real-world use case:
+
+simulation
+Goal: “Can we re-discover held-out true edges?”
+
+Build observed graph 
+𝐺
+′
+G′ by sampling edges from 
+𝐺
+G but keeping it connected.
+
+Holdout/test positives 
+𝑌
+=
+𝐸
+∖
+𝐸
+′
+Y=E∖E′. Add the same number of negatives sampled from non-edges of 
+𝐺
+G.
+
+Compute test features on 
+𝐺
+′
+G′ (because at prediction time those edges were not yet visible).
+
+Build training support graph 
+𝐺
+′′
+⊂
+𝐺
+′
+G′′⊂G′ (again connected).
+
+Train positives 
+𝑌
+′
+=
+𝐸
+′
+∖
+𝐸
+′′
+Y
+′
+=E′∖E′′ + negatives sampled from non-edges of 
+𝐺
+′
+G′.
+
+Compute train features on 
+𝐺
+′′
+G′′.
+
+(Optional) class balancing via oversampling on train only.
+
+Cross-validation folds are stratified if labels exist.
+
+discovery
+Goal: “Score new non-edges in the current graph.”
+
+Test = a (capped) set of non-edges of 
+𝐺
+G (unlabeled).
+
+Training uses an observed 
+𝐺
+′
+⊂
+𝐺
+G′⊂G to avoid look-ahead leakage.
+
+Train positives 
+𝐸
+∖
+𝐸
+′
+E∖E′, negatives sampled from non-edges of 
+𝐺
+G.
+
+Test features on 
+𝐺
+G; Train features on 
+𝐺
+′
+G′.
+
+specific
+Goal: “Score a user-supplied set of pairs.”
+
+Test = provided pairs, features on 
+𝐺
+G.
+
+Training uses a connected subset 
+𝐺
+train
+⊂
+𝐺
+G
+train
+	​
+
+⊂G.
+
+Train positives 
+𝐸
+∖
+𝐸
+train
+E∖E
+train
+	​
+
+, negatives from non-edges of 
+𝐺
+G.
+
+Train features on 
+𝐺
+train
+G
+train
+	​
+
+.
+
+Key mantra: features for a label set are computed on the graph the model would have at prediction time. That’s why holdout is computed on 
+𝐺
+′
+G′, and training is computed on 
+𝐺
+′′
+G′′ (or 
+𝐺
+′
+G′/
+𝐺
+train
+G
+train
+	​
+
+ in other scenarios).
 
 ## 🚀 Features
 
