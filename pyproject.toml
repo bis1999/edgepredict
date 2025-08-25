@@ -1,52 +1,19 @@
-# pyproject.toml
-# Top-level build + metadata file (PEP 518 + PEP 621)
-
-##############################
-#  Build backend: Setuptools #
-##############################
 [build-system]
-requires = ["setuptools>=69", "wheel"]   # tools needed at build-time
-build-backend = "setuptools.build_meta"  # use classic Setuptools
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
-#########################
-#  Core project metadata#
-#########################
 [project]
-name            = "graphintel"                   # `pip install graphintel`
-version         = "0.0.1"                        # bump & tag later
-description     = "GraphIntel: link-prediction toolkit"
-readme          = "README.md"
+name = "linkpredx"
+version = "0.1.0"
+description = "Unified link prediction toolkit (ML + GNN)."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Your Name" }]
 requires-python = ">=3.9"
-license         = {file = "LICENSE"}
+dependencies = ["numpy","pandas","scikit-learn","networkx","imbalanced-learn","torch","torch-geometric","torch-sparse","tqdm","pyyaml","joblib"]
 
-authors = [
-  {name = "Bisman Singh", email = "you@example.com"}
-]
+[tool.setuptools]
+package-dir = {"" = "src"}
 
-keywords = ["link prediction", "networkx", "topological features"]
-
-###################
-# Runtime deps    #
-###################
-dependencies = [
-  "numpy>=1.24",
-  "pandas>=2.0",
-  "networkx>=3.2",
-  "scikit-learn>=1.4",
-  "scipy>=1.10",
-  "imbalanced-learn>=0.11",
-  "tqdm>=4.66"
-]
-
-#############################
-# Optional extra groups     #
-#############################
-[project.optional-dependencies]
-dev  = ["pytest", "black", "ruff", "pre-commit"]
-docs = ["mkdocs-material"]
-
-#####################################
-# Tell Setuptools where code lives  #
-#####################################
 [tool.setuptools.packages.find]
-where = ["src"]     # ← we’re using the “src/” layout
+where = ["src"]
