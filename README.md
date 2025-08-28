@@ -3,49 +3,76 @@
 A comprehensive machine learning framework for **graph link prediction** that supports multiple scenarios, rich feature extraction, and both **traditional ML** and **Graph Neural Network (GNN)** approaches.  
 It also includes a **meta-learner** that predicts the best-performing model for a given graph, saving time and avoiding trial-and-error.
 
+> **Paper:** *Meta-learning optimizes predictions of missing links in real-world networks* — Bisman Singh, Lucy Van Kleunen, Aaron Clauset.  
+> arXiv: https://arxiv.org/abs/2508.09069
+
 ---
 
-## 📦 Installation
+## 📦 Dev Setup (no PyPI)
 
-Install from source:
+You and your users can run everything directly from a clone (no packaging needed).
 
+### 1) Create an environment
+**Conda**
+```bash
+conda create -n edgepredict python=3.11 -y
+conda activate edgepredict
+```
+**OR venv**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+```
+
+### 2) Clone the repo
 ```bash
 git clone https://github.com/bis1999/edgepredict.git
 cd edgepredict
-pip install -e .
 ```
 
-Optional extras for a smoother download experience:
-
+### 3) Install dependencies
 ```bash
-pip install "edgepredict[download]"
+pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-> Python 3.10–3.12 recommended. See `requirements.txt` for pinned versions used during development.
+> If PyTorch/PyG wheels complain on your platform, install Torch first from the official instructions for your OS/CUDA, then re-run `pip install -r requirements.txt`.
+
+### 4) Imports (no packaging required)
+When you run from the **repo root**, Python can import `link_prediction` directly.  
+In notebooks or scripts launched from the repo root, you can do:
+
+```python
+from link_prediction.models.downloader import ensure_models
+```
+
+If you run from a different working directory, add the repo path:
+
+```python
+import os, sys
+sys.path.append(os.path.abspath("/path/to/edgepredict"))
+```
 
 ---
 
 ## 🔽 Download pretrained models
 
-Pretrained meta-learner models are required. By default, they are stored in **`meta_learner_models/`** at the project root.
+Pretrained meta-learner models are stored in **`meta_learner_models/`** at the repo root.
 
 ### Option A — Python API (recommended)
 
 ```python
-from linkpredx.git_link_script.link_prediction.models import ensure_models
+from link_prediction.models.downloader import ensure_models
 
 # Downloads release v0.1.0 assets (with resume/retries) into ./meta_learner_models/
-models_dir = ensure_models()
+models_dir = ensure_models("meta_learner_models")
 print("Models ready at:", models_dir)
 ```
 
-✔️ Resume support  
-✔️ SHA-256 checksum verification  
-✔️ Uses `GITHUB_TOKEN` if available (avoids throttling)
+✔️ Resume support • ✔️ SHA-256 verification • ✔️ Uses `GITHUB_TOKEN` if available
 
-### Option B — wget (Jupyter-friendly)
-
-Paste this as a single **`%%bash`** cell in Jupyter, or run in your shell:
+### Option B — wget (Jupyter-/shell-friendly)
+Paste this as a **`%%bash`** cell in Jupyter, or run in your shell:
 
 ```bash
 %%bash
@@ -87,15 +114,14 @@ fi
 
 ## ⚙️ Configuration
 
-Feature extraction is controlled via a simple YAML file (e.g., `configs/feature.yaml`). Toggle features on/off with booleans. Typical groups include:
+Feature extraction is controlled via YAML (see `configs/feature.yaml`). Toggle features on/off with booleans. Typical groups include:
 
-- **Classical**: Common Neighbors, Jaccard, Adamic–Adar, Resource Allocation, LHN
-- **Centralities**: Degree, Closeness, Betweenness, Eigenvector, PageRank
-- **Clustering & triangles**
+- **Classical**: Common Neighbors, Jaccard, Adamic–Adar, Resource Allocation, LHN  
+- **Centralities**: Degree, Closeness, Betweenness, Eigenvector, PageRank  
+- **Clustering & triangles**  
 - **SVD-based**: LRA / dLRA / mLRA variants
 
-Example snippet:
-
+Example:
 ```yaml
 classical:
   common_neighbors: true
@@ -115,46 +141,46 @@ svd:
 
 ---
 
-## 🧠 Core ideas & scenarios
+## 🧠 Core ideas & scenarios (plain text)
 
-We support **three evaluation scenarios**, each matching a real-world use case.  
-**Mantra:** features for a label set are computed on the **graph available at prediction time**.
+We support **three evaluation scenarios** matching common use cases.  
+**Mantra:** compute features on the **graph available at prediction time** to avoid look-ahead leakage.
 
 ### 1) Simulation
-**Goal:** “Can we re-discover held-out true edges?”  
-- Build observed graph \( G' \) by sampling edges from \( G \) while keeping it connected.  
-- Holdout/test positives \( Y = E \setminus E' \); add an equal number of negatives from non-edges of \( G \).  
-- Compute **test features** on \( G' \) (those edges weren’t visible at prediction time).  
-- Build training support graph \( G'' \subset G' \) (connected).  
-- Train positives \( Y' = E' \setminus E'' \) plus negatives from non-edges of \( G' \).  
-- Compute **train features** on \( G'' \).  
-- (Optional) apply oversampling **on train only**. Cross-validation folds are supported.
+Goal: re-discover held-out true edges.  
+- Build observed graph **G_prime** by sampling edges from **G** (keep connected).  
+- Test positives = **E minus E_prime**; add equal # negatives from non-edges of **G**.  
+- Compute **test features on G_prime** (those edges weren’t visible when predicting).  
+- Build training support graph **G_double_prime ⊂ G_prime** (connected).  
+- Train positives = **E_prime minus E_double_prime**; add negatives from non-edges of **G_prime**.  
+- Compute **train features on G_double_prime**.  
+- Optional: oversampling on train only. Stratified CV supported.
 
 ### 2) Discovery
-**Goal:** “Score new non-edges in the current graph.”  
-- Test = a (capped) set of non-edges of \( G \) (unlabeled).  
-- Training uses an observed \( G' \subset G \) to avoid look-ahead leakage.  
-- Train positives \( E \setminus E' \), negatives from non-edges of \( G \).  
-- **Test features** on \( G \); **Train features** on \( G' \).
+Goal: score new non-edges in the current graph.  
+- Test = capped set of non-edges of **G** (unlabeled).  
+- Training uses observed **G_prime ⊂ G** to avoid leakage.  
+- Train positives **E minus E_prime**, negatives from non-edges of **G**.  
+- Compute **test features on G**, **train features on G_prime**.
 
 ### 3) Specific
-**Goal:** “Score a user-supplied set of pairs.”  
-- Test = provided pairs; features computed on \( G \).  
-- Training uses a connected subset \( G_{\text{train}} \subset G \).  
-- Train positives \( E \setminus E_{\text{train}} \), negatives from non-edges of \( G \).  
-- **Train features** on \( G_{\text{train}} \).
+Goal: score a user-supplied set of pairs.  
+- Test = provided pairs; compute features on **G**.  
+- Training uses connected subset **G_train ⊂ G**.  
+- Train positives **E minus E_train**, negatives from non-edges of **G**.  
+- Compute **train features on G_train**.
 
 ---
 
 ## 🚀 Quickstart (programmatic)
 
 ```python
-# 1) Ensure pretrained meta-learner models are present
-from linkpredx.git_link_script.link_prediction.models import ensure_models
-ensure_models()  # downloads into ./meta_learner_models if needed
+# 1) Ensure pretrained models are present
+from link_prediction.models.downloader import ensure_models
+ensure_models("meta_learner_models")  # downloads + verifies
 
-# 2) Prepare a simple graph
-from linkpredx.git_link_script.core.dataset_preparer import LinkPredictionDatasetPreparer, DatasetConfig
+# 2) Prepare a small graph (edge list)
+from link_prediction.core.dataset_preparer import LinkPredictionDatasetPreparer, DatasetConfig
 edges = [(1,2), (2,3), (3,4), (1,4), (2,4)]
 cfg = DatasetConfig(validation_frac=0.2, cv_folds=5, random_state=42)
 prep = LinkPredictionDatasetPreparer(edges, cfg)
@@ -164,8 +190,8 @@ train_data, test_data = prep.prepare_simulation()        # or:
 # train_data, test_data = prep.prepare_discovery()
 # train_data, test_data = prep.prepare_specific(pairs=[(1,5), (2,5)])
 
-# 4) Train baselines (RF/XGB/LogReg; GNNs if enabled)
-from linkpredx.git_link_script.trainer import LinkPredictionTrainer
+# 4) Train baselines (RF/XGB/LogReg; GNNs if enabled in your setup)
+from link_prediction.training.trainer import LinkPredictionTrainer
 trainer = LinkPredictionTrainer(train_data, test_data)
 results = trainer.run_all()   # returns metrics tables
 print(results)
@@ -175,18 +201,17 @@ print(results)
 
 ## 🧠 Meta-learner usage
 
-Use graph-level statistics to predict the best algorithm and expected performance (AUC / Top-K) **before** running heavy training:
+Use graph-level statistics to predict the best algorithm and expected performance (AUC / Top-K) **before** training:
 
 ```python
-from linkpredx.git_link_script.graph_predictor import GraphPredictor
-from linkpredx.git_link_script.link_prediction.models import ensure_models
+from link_prediction.utils.graph_predictor import GraphPredictor
+from link_prediction.models.downloader import ensure_models
 
-ensure_models()  # makes sure meta_learner_models/ is populated
+ensure_models("meta_learner_models")
 gp = GraphPredictor(models_path="meta_learner_models")
 
-# Run on an edgelist file (or supply a NetworkX graph in your implementation)
+# Example: run on an edgelist file
 pred = gp.predict_from_graph("example_networks/facebook.edgelist")
-
 print("Best model:", pred["best_model"])
 print("Predicted AUC:", pred["auc"])
 print("Predicted Top-K:", pred["topk"])
@@ -194,22 +219,69 @@ print("Predicted Top-K:", pred["topk"])
 
 ---
 
-## 📂 Repository layout
+## 📁 Repository layout (current)
 
 ```
-git_link_script/
- ├── configs/                 # YAML configs (feature toggles, etc.)
- ├── example_networks/        # small example graphs
- ├── Link Prediction Demo Notebook.ipynb
- ├── link_prediction/
- │    ├── core/               # dataset preparation & orchestration
- │    ├── features/           # feature extraction modules
- │    ├── models/             # pretrained model downloader (ensure_models)
- │    ├── prediction/         # meta-learner & predictors
- │    ├── utils/              # logging & helpers
- ├── meta_learner_models/     # pretrained meta-learner models (downloaded here)
- └── requirements.txt
+edgepredict/
+├── configs/
+├── example_networks/
+├── link_prediction/
+│   ├── core/
+│   ├── features/
+│   ├── models/
+│   ├── training/
+│   └── utils/
+├── meta_learner_models/
+├── Link Prediction Demo Notebook.ipynb
+├── requirements.txt
+├── LICENSE
+├── README.md
+├── .gitattributes
+└── .gitignore
 ```
+
+### Example `src/` layout (optional, for packaging later)
+
+If you later move to a canonical `src/` layout for packaging:
+
+```
+src/
+├── link_prediction/
+│   ├── __init__.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   └── dataset_preparer.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── gnn_models.py
+│   │   ├── gnn_trainer.py
+│   │   └── ml_models.py
+│   ├── features/
+│   │   ├── __init__.py
+│   │   ├── features.py
+│   │   └── features_light.py
+│   ├── training/
+│   │   ├── __init__.py
+│   │   └── trainer.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── edge_sampler.py
+│   │   ├── graph_processor.py
+│   │   ├── graph_predictor.py
+│   │   ├── logger.py
+│   │   ├── metrics.py
+│   │   ├── pair_dataset.py
+│   │   └── utils.py
+```
+
+---
+
+## ✍️ Authors & Links
+
+- **Paper:** *Meta-learning optimizes predictions of missing links in real-world networks*  
+  Bisman Singh, Lucy Van Kleunen, Aaron Clauset — arXiv: https://arxiv.org/abs/2508.09069
+- **Author:** Bisman Singh — Email: <singh.bisman7@gmail.com> — LinkedIn: https://www.linkedin.com/in/bisman-singh1999/
 
 ---
 
