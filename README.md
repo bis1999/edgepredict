@@ -1,648 +1,225 @@
-# Link Prediction Framework
+# EdgePredict
 
-A comprehensive machine learning framework for graph link prediction that supports multiple scenarios, feature extraction methods, and both traditional ML and Graph Neural Network (GNN) approaches.
-Core ideas & logic
-1) Scenarios
-
-We support three evaluation scenarios, each mirroring a real-world use case:
-
-simulation
-Goal: “Can we re-discover held-out true edges?”
-
-Build observed graph 
-𝐺
-′
-G′ by sampling edges from 
-𝐺
-G but keeping it connected.
-
-Holdout/test positives 
-𝑌
-=
-𝐸
-∖
-𝐸
-′
-Y=E∖E′. Add the same number of negatives sampled from non-edges of 
-𝐺
-G.
-
-Compute test features on 
-𝐺
-′
-G′ (because at prediction time those edges were not yet visible).
-
-Build training support graph 
-𝐺
-′′
-⊂
-𝐺
-′
-G′′⊂G′ (again connected).
-
-Train positives 
-𝑌
-′
-=
-𝐸
-′
-∖
-𝐸
-′′
-Y
-′
-=E′∖E′′ + negatives sampled from non-edges of 
-𝐺
-′
-G′.
-
-Compute train features on 
-𝐺
-′′
-G′′.
-
-(Optional) class balancing via oversampling on train only.
-
-Cross-validation folds are stratified if labels exist.
-
-discovery
-Goal: “Score new non-edges in the current graph.”
-
-Test = a (capped) set of non-edges of 
-𝐺
-G (unlabeled).
-
-Training uses an observed 
-𝐺
-′
-⊂
-𝐺
-G′⊂G to avoid look-ahead leakage.
-
-Train positives 
-𝐸
-∖
-𝐸
-′
-E∖E′, negatives sampled from non-edges of 
-𝐺
-G.
-
-Test features on 
-𝐺
-G; Train features on 
-𝐺
-′
-G′.
-
-specific
-Goal: “Score a user-supplied set of pairs.”
-
-Test = provided pairs, features on 
-𝐺
-G.
-
-Training uses a connected subset 
-𝐺
-train
-⊂
-𝐺
-G
-train
-	​
-
-⊂G.
-
-Train positives 
-𝐸
-∖
-𝐸
-train
-E∖E
-train
-	​
-
-, negatives from non-edges of 
-𝐺
-G.
-
-Train features on 
-𝐺
-train
-G
-train
-	​
-
-.
-
-Key mantra: features for a label set are computed on the graph the model would have at prediction time. That’s why holdout is computed on 
-𝐺
-′
-G′, and training is computed on 
-𝐺
-′′
-G′′ (or 
-𝐺
-′
-G′/
-𝐺
-train
-G
-train
-	​
-
- in other scenarios).
-
-## 🚀 Features
-
-- **Multiple Prediction Scenarios**: Simulation, Discovery, and Specific edge prediction
-- **Dual Backend Support**: Traditional ML (Random Forest, Logistic Regression, SVM, XGBoost) and GNNs (GCN, GraphSAGE)
-- **Rich Feature Extraction**: 20+ graph features including centrality measures, similarity indices, and SVD-based embeddings
-- **Intelligent Model Selection**: Pre-trained meta-models for automatic algorithm recommendation
-- **Flexible Configuration**: YAML-based feature toggles and hyperparameter management
-- **Cross-Validation**: Built-in stratified k-fold validation with early stopping
-- **Comprehensive Evaluation**: Multiple metrics including AUC, precision@k, recall@k, and F1 scores
-
-## 📋 Table of Contents
-
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Usage Examples](#usage-examples)
-- [Configuration](#configuration)
-- [Feature Extraction](#feature-extraction)
-- [Model Selection](#model-selection)
-- [API Reference](#api-reference)
-- [Performance](#performance)
-- [Contributing](#contributing)
-
-## 🛠️ Installation
-
-### Prerequisites
-
-```bash
-# Core dependencies
-pip install networkx pandas numpy scikit-learn matplotlib seaborn
-
-# Optional dependencies for enhanced performance
-pip install torch torch-geometric  # For GNN support
-pip install scipy numba             # For fast feature computation
-pip install igraph                  # For optimized graph operations
-pip install xgboost                 # For XGBoost models
-```
-
-### Basic Installation
-
-```bash
-git clone https://github.com/yourusername/link-prediction-framework.git
-cd link-prediction-framework
-pip install -r requirements.txt
-```
-
-## ⚡ Quick Start
-
-```python
-import networkx as nx
-from config import GeneratorConfig
-from dataset_preparer import LinkPredictionDatasetPreparer
-from trainer import LinkPredictionTrainer
-
-# 1. Create or load your graph
-G = nx.karate_club_graph()
-
-# 2. Configure the dataset preparation
-config = GeneratorConfig(
-    obs_frac=0.8,           # Use 80% of edges for training
-    train_frac=0.8,         # 80% of observed edges for training
-    n_folds=5,              # 5-fold cross-validation
-    balance_classes=True    # Balance positive/negative samples
-)
-
-# 3. Prepare dataset for simulation scenario
-preparer = LinkPredictionDatasetPreparer(G, config)
-workflow_result = preparer.prepare_dataset(scenario="simulation")
-
-# 4. Train models
-trainer = LinkPredictionTrainer(workflow_result)
-
-# Train ML models
-ml_results = trainer.train_ml_models(
-    models=["random_forest", "logistic_regression"],
-    primary_metric="auc"
-)
-
-# Train GNN model
-gnn_results = trainer.train_gnn_model(
-    model_type="sage",
-    epochs=300,
-    hidden_dims=[64, 32]
-)
-
-# 5. Compare results
-print(f"ML Best Model: {ml_results['best_summary']['model']}")
-print(f"ML AUC: {ml_results['best_summary']['best_score']:.4f}")
-print(f"GNN AUC: {gnn_results['simulation_metrics']['auc']:.4f}")
-```
-
-## 🏗️ Architecture
-
-### Core Components
-
-```
-link-prediction-framework/
-├── config.py              # Configuration management
-├── dataset_preparer.py     # Data preparation and splitting
-├── trainer.py             # Unified training orchestrator
-├── ml_models.py           # Traditional ML models
-├── gnn_trainer.py         # Graph Neural Network trainer
-├── features.py            # Heavy feature extraction (PyTorch/SciPy)
-├── features_light.py      # Lightweight feature extraction
-├── graph_predictor.py     # Meta-model for algorithm selection
-├── metrics.py             # Evaluation metrics
-├── edge_sampler.py        # Negative edge sampling
-├── graph_processor.py     # Graph processing utilities
-├── pair_dataset.py        # Pairwise feature dataset generation
-├── utils.py               # Utility functions
-├── logger.py              # Logging configuration
-├── configs/
-│   └── features.yaml      # Feature toggle configuration
-└── Models/
-    ├── best_auc_model_classifier.pkl
-    ├── best_topk_model_classifier.pkl
-    └── ...                # Pre-trained meta-models
-```
-
-### Three Prediction Scenarios
-
-1. **Simulation**: Predict held-out edges from a complete graph
-2. **Discovery**: Find new potential edges in an existing graph
-3. **Specific**: Score user-provided edge candidates
-
-## 💡 Usage Examples
-
-### Scenario 1: Simulation (Link Recovery)
-
-```python
-# Hide 20% of edges and try to recover them
-config = GeneratorConfig(obs_frac=0.8, train_frac=0.8)
-preparer = LinkPredictionDatasetPreparer(G, config)
-result = preparer.prepare_dataset(scenario="simulation")
-
-trainer = LinkPredictionTrainer(result)
-ml_results = trainer.train_ml_models()
-
-print(f"Recovered edges with AUC: {ml_results['holdout_metrics']['auc']:.4f}")
-```
-
-### Scenario 2: Discovery (New Edge Prediction)
-
-```python
-# Find potential new connections
-result = preparer.prepare_dataset(scenario="discovery")
-trainer = LinkPredictionTrainer(result)
-gnn_results = trainer.train_gnn_model(model_type="gcn")
-
-# Get top-k predictions
-predictions = gnn_results['candidate_predictions']
-top_predictions = predictions.nlargest(10, 'prediction_score')
-```
-
-### Scenario 3: Specific Edge Scoring
-
-```python
-# Score specific edge candidates
-candidate_edges = [(1, 5), (2, 8), (3, 7)]
-result = preparer.prepare_dataset(
-    scenario="specific", 
-    predict_edges=candidate_edges
-)
-
-trainer = LinkPredictionTrainer(result)
-results = trainer.train_ml_models()
-scores = results['candidate_predictions']['prediction_score']
-```
-
-### Intelligent Model Selection
-
-```python
-from graph_predictor import GraphPredictor
-
-# Get algorithm recommendation
-predictor = GraphPredictor()
-recommendation = predictor.predict(G)
-
-print(f"Best for AUC: {recommendation['predicted_best_auc_model']}")
-print(f"Best for top-k: {recommendation['predicted_best_topk_model']}")
-print(f"Expected AUC: {recommendation['predicted_auc_score']:.4f}")
-
-# Use recommended model
-trainer = LinkPredictionTrainer(workflow_result)
-results = trainer.train_ml_models(
-    models=[recommendation['predicted_best_auc_model']]
-)
-```
-
-## ⚙️ Configuration
-
-### Dataset Configuration
-
-```python
-from config import GeneratorConfig
-
-config = GeneratorConfig(
-    # Graph splitting
-    obs_frac=0.8,                    # Fraction of edges to observe
-    train_frac=0.8,                  # Fraction of observed edges for training
-    
-    # Negative sampling
-    train_neg_per_pos=3.0,           # Negative to positive ratio for training
-    sim_ho_neg_per_pos=2.0,          # Negative to positive ratio for holdout
-    train_neg_max_cap=50000,         # Maximum negative samples for training
-    
-    # Cross-validation
-    n_folds=5,                       # Number of CV folds
-    use_stratified_cv=True,          # Use stratified CV
-    balance_classes=True,            # Balance classes with oversampling
-    
-    # Features
-    k_svd=50,                        # SVD rank for matrix factorization
-    feature_config_path="configs/features.yaml",
-    
-    # Randomness
-    random_state=42
-)
-```
-
-### Feature Configuration (configs/features.yaml)
-
-```yaml
-# Node-level features
-triangles: true
-clustering: true
-pagerank: true
-betweenness: true
-closeness: true
-eigenvector: true
-degree_centrality: true
-
-# Pairwise features
-common_neighbors: true
-jaccard_coefficient: true
-adamic_adar: true
-resource_allocation: true
-preferential_attachment: true
-lhn_index: false
-
-# SVD-based features (requires heavy backend)
-svd_dot: true
-svd_mean: true
-lra: true
-dlra: true
-mlra: true
-
-# Distance features
-shortest_paths: false  # Expensive for large graphs
-```
-
-## 🎯 Feature Extraction
-
-### Available Features
-
-**Node-level features** (computed per node, then mapped to edges):
-- Triangle count
-- Clustering coefficient  
-- PageRank centrality
-- Betweenness centrality
-- Closeness centrality
-- Eigenvector centrality
-- Degree centrality
-
-**Pairwise features** (computed directly for edge pairs):
-- Common neighbors
-- Jaccard coefficient
-- Adamic-Adar index
-- Resource allocation index
-- Preferential attachment
-- Leicht-Holme-Newman index
-- Shortest path distance
-
-**SVD-based features** (matrix factorization):
-- SVD dot product
-- SVD neighborhood mean
-- Low-rank approximation (LRA)
-- Directional LRA
-- Mean LRA
-
-### Performance Backends
-
-**Heavy Backend** (features.py):
-- Uses PyTorch, SciPy, igraph, Numba
-- Optimized for large graphs
-- Full SVD feature support
-- 10-100x faster on large graphs
-
-**Light Backend** (features_light.py):
-- Pure NetworkX implementation
-- No external dependencies
-- Good for small-medium graphs
-- Automatic fallback when heavy deps unavailable
-
-## 🤖 Model Selection
-
-The framework includes pre-trained meta-models that analyze graph topology and recommend the best algorithm:
-
-```python
-predictor = GraphPredictor()
-recommendation = predictor.predict(G)
-
-# Example output:
-{
-    'predicted_best_auc_model': 'random_forest',
-    'predicted_best_topk_model': 'xgboost', 
-    'predicted_auc_score': 0.8542,
-    'predicted_topk_score': 0.7891,
-    'topological_features': {
-        'average_clustering': 0.5706,
-        'avg_degree': 4.588,
-        'number_of_nodes': 34.0,
-        ...
-    }
-}
-```
-
-### Supported Models
-
-**Traditional ML**:
-- Random Forest
-- Logistic Regression  
-- Support Vector Machine
-- XGBoost (optional)
-
-**Graph Neural Networks**:
-- Graph Convolutional Network (GCN)
-- GraphSAGE
-
-## 📊 API Reference
-
-### Core Classes
-
-#### `LinkPredictionDatasetPreparer`
-
-```python
-preparer = LinkPredictionDatasetPreparer(G, config)
-result = preparer.prepare_dataset(
-    scenario="simulation",           # "simulation", "discovery", "specific"
-    predict_edges=None               # Required for "specific" scenario
-)
-```
-
-#### `LinkPredictionTrainer`
-
-```python
-trainer = LinkPredictionTrainer(workflow_result, device="cpu")
-
-# ML training
-ml_results = trainer.train_ml_models(
-    models=["random_forest", "xgboost"],
-    primary_metric="auc",
-    ks=[5, 10, 20]
-)
-
-# GNN training  
-gnn_results = trainer.train_gnn_model(
-    model_type="sage",
-    epochs=300,
-    hidden_dims=[64, 32],
-    learning_rate=0.01
-)
-
-# Compare both
-comparison = trainer.compare_backends()
-```
-
-#### `GraphPredictor`
-
-```python
-predictor = GraphPredictor(use_igraph=True, model_dir="Models")
-recommendation = predictor.predict(G)
-batch_results = predictor.predict_batch([G1, G2, G3])
-```
-
-### Utility Functions
-
-```python
-# Convenience function
-from trainer import train_scenario_models
-
-results = train_scenario_models(
-    workflow_result=result,
-    backend="ml",  # or "gnn"
-    device="cpu"
-)
-```
-
-## 🚄 Performance
-
-### Benchmark Results
-
-Framework performance on various graph sizes:
-
-| Graph Size | Nodes | Edges | Feature Time | Training Time | Memory |
-|------------|-------|-------|--------------|---------------|---------|
-| Small      | 100   | 500   | 0.1s        | 2s           | 50MB   |
-| Medium     | 1K    | 5K    | 0.8s        | 15s          | 200MB  |  
-| Large      | 10K   | 50K   | 8s          | 120s         | 1.2GB  |
-| X-Large    | 100K  | 500K  | 85s         | 1800s        | 8GB    |
-
-### Optimization Tips
-
-1. **Use igraph backend** for large graphs: `pip install igraph`
-2. **Enable SVD features selectively** - they're powerful but expensive
-3. **Limit negative sampling** with `max_negative_samples` for discovery
-4. **Use GPU for GNNs**: Set `device="cuda"`
-5. **Feature caching**: Features are computed fresh each time (by design for flexibility)
-
-### Memory Management
-
-```python
-# For large graphs, limit negative sampling
-config = GeneratorConfig(
-    max_negative_samples=100_000,    # Cap discovery test size
-    train_neg_max_cap=50_000,        # Cap training negatives
-    sim_ho_neg_max_cap=20_000        # Cap simulation holdout negatives
-)
-```
-
-## 🧪 Evaluation Metrics
-
-The framework provides comprehensive evaluation:
-
-```python
-{
-    'auc': 0.8542,                   # Area under ROC curve
-    'avg_precision': 0.7891,         # Average precision
-    'accuracy': 0.8123,              # Classification accuracy
-    'precision': 0.7654,             # Precision at threshold
-    'recall': 0.8234,                # Recall at threshold
-    'f1': 0.7932,                    # F1 score at threshold
-    'precision@5': 0.9200,           # Precision at top-5
-    'recall@5': 0.2300,              # Recall at top-5
-    'precision@10': 0.8500,          # Precision at top-10
-    'recall@10': 0.4250,             # Recall at top-10
-    'hits@10': 17                    # Number of hits in top-10
-}
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Areas where help is needed:
-
-- **New algorithms**: Implement additional ML/GNN models
-- **Feature engineering**: Add new graph features
-- **Optimization**: Performance improvements for large graphs
-- **Documentation**: Examples and tutorials
-- **Testing**: Unit tests and benchmarks
-
-### Development Setup
-
-```bash
-git clone https://github.com/yourusername/link-prediction-framework.git
-cd link-prediction-framework
-pip install -e .
-pip install pytest black flake8
-pytest tests/
-```
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📚 Citation
-
-If you use this framework in your research, please cite:
-
-```bibtex
-@software{link_prediction_framework,
-  title={Link Prediction Framework: A Comprehensive Machine Learning Toolkit},
-  author={Your Name},
-  year={2025},
-  url={https://github.com/yourusername/link-prediction-framework}
-}
-```
-
-## 🔗 Related Work
-
-- [NetworkX](https://networkx.org/) - Graph analysis library
-- [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/) - GNN framework
-- [scikit-learn](https://scikit-learn.org/) - Machine learning library
-- [igraph](https://igraph.org/) - High-performance graph analysis
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/link-prediction-framework/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/link-prediction-framework/discussions)
-- **Email**: your.email@example.com
+A comprehensive machine learning framework for **graph link prediction** that supports multiple scenarios, rich feature extraction, and both **traditional ML** and **Graph Neural Network (GNN)** approaches.  
+It also includes a **meta-learner** that predicts the best-performing model for a given graph, saving time and avoiding trial-and-error.
 
 ---
 
-**Happy Link Predicting!** 🎯
+## 📦 Installation
+
+Install from source:
+
+```bash
+git clone https://github.com/bis1999/edgepredict.git
+cd edgepredict
+pip install -e .
+```
+
+Optional extras for a smoother download experience:
+
+```bash
+pip install "edgepredict[download]"
+```
+
+> Python 3.10–3.12 recommended. See `requirements.txt` for pinned versions used during development.
+
+---
+
+## 🔽 Download pretrained models
+
+Pretrained meta-learner models are required. By default, they are stored in **`meta_learner_models/`** at the project root.
+
+### Option A — Python API (recommended)
+
+```python
+from linkpredx.git_link_script.link_prediction.models import ensure_models
+
+# Downloads release v0.1.0 assets (with resume/retries) into ./meta_learner_models/
+models_dir = ensure_models()
+print("Models ready at:", models_dir)
+```
+
+✔️ Resume support  
+✔️ SHA-256 checksum verification  
+✔️ Uses `GITHUB_TOKEN` if available (avoids throttling)
+
+### Option B — wget (Jupyter-friendly)
+
+Paste this as a single **`%%bash`** cell in Jupyter, or run in your shell:
+
+```bash
+%%bash
+set -euo pipefail
+TAG="v0.1.0"
+OWNER="bis1999"
+REPO="edgepredict"
+BASE="https://github.com/${OWNER}/${REPO}/releases/download/${TAG}"
+
+mkdir -p meta_learner_models
+cd meta_learner_models
+
+# Download with resume (-c)
+wget -c "${BASE}/auc_label_encoder.pkl"
+wget -c "${BASE}/auc_score_regressor.pkl"
+wget -c "${BASE}/best_auc_model_classifier.pkl"
+wget -c "${BASE}/best_topk_model_classifier.pkl"
+wget -c "${BASE}/topk_label_encoder.pkl"
+wget -c "${BASE}/topk_score_regressor.pkl"
+
+# Verify SHA-256 checksums
+cat > checksums.sha256 <<'EOF'
+41be0890f06d446db2085d7cde664ff1b47ca8e87985b34f9a7e06af41a0eb34  auc_label_encoder.pkl
+2bdb2f204e371d748aeea85a3a8c046afe914b3917b98e870b4fe1a4d7bf99fe  auc_score_regressor.pkl
+28013ab22d9111e24180ab17d9176ba661cf67ac566a8c820ee3dbb8baba506d  best_auc_model_classifier.pkl
+36b54a5e171991e1b1b312427bdaefc000c90bd5387a6e4af4fffc7a50840ada  best_topk_model_classifier.pkl
+178ce76129e643263c22faee77f675f0941ff10c119eb41b74e74a017c9b8616  topk_label_encoder.pkl
+9fe6ddd7f36a95e3e54a5a2f887494560a744213e6d2c8f2e8da6f1a54e799f8  topk_score_regressor.pkl
+EOF
+
+if command -v sha256sum >/dev/null 2>&1; then
+  sha256sum -c checksums.sha256
+else
+  shasum -a 256 -c checksums.sha256
+fi
+```
+
+---
+
+## ⚙️ Configuration
+
+Feature extraction is controlled via a simple YAML file (e.g., `configs/feature.yaml`). Toggle features on/off with booleans. Typical groups include:
+
+- **Classical**: Common Neighbors, Jaccard, Adamic–Adar, Resource Allocation, LHN
+- **Centralities**: Degree, Closeness, Betweenness, Eigenvector, PageRank
+- **Clustering & triangles**
+- **SVD-based**: LRA / dLRA / mLRA variants
+
+Example snippet:
+
+```yaml
+classical:
+  common_neighbors: true
+  jaccard: true
+  adamic_adar: true
+  resource_allocation: true
+  lhn: false
+
+centrality:
+  degree: true
+  pagerank: true
+
+svd:
+  enabled: true
+  k: 64
+```
+
+---
+
+## 🧠 Core ideas & scenarios
+
+We support **three evaluation scenarios**, each matching a real-world use case.  
+**Mantra:** features for a label set are computed on the **graph available at prediction time**.
+
+### 1) Simulation
+**Goal:** “Can we re-discover held-out true edges?”  
+- Build observed graph \( G' \) by sampling edges from \( G \) while keeping it connected.  
+- Holdout/test positives \( Y = E \setminus E' \); add an equal number of negatives from non-edges of \( G \).  
+- Compute **test features** on \( G' \) (those edges weren’t visible at prediction time).  
+- Build training support graph \( G'' \subset G' \) (connected).  
+- Train positives \( Y' = E' \setminus E'' \) plus negatives from non-edges of \( G' \).  
+- Compute **train features** on \( G'' \).  
+- (Optional) apply oversampling **on train only**. Cross-validation folds are supported.
+
+### 2) Discovery
+**Goal:** “Score new non-edges in the current graph.”  
+- Test = a (capped) set of non-edges of \( G \) (unlabeled).  
+- Training uses an observed \( G' \subset G \) to avoid look-ahead leakage.  
+- Train positives \( E \setminus E' \), negatives from non-edges of \( G \).  
+- **Test features** on \( G \); **Train features** on \( G' \).
+
+### 3) Specific
+**Goal:** “Score a user-supplied set of pairs.”  
+- Test = provided pairs; features computed on \( G \).  
+- Training uses a connected subset \( G_{\text{train}} \subset G \).  
+- Train positives \( E \setminus E_{\text{train}} \), negatives from non-edges of \( G \).  
+- **Train features** on \( G_{\text{train}} \).
+
+---
+
+## 🚀 Quickstart (programmatic)
+
+```python
+# 1) Ensure pretrained meta-learner models are present
+from linkpredx.git_link_script.link_prediction.models import ensure_models
+ensure_models()  # downloads into ./meta_learner_models if needed
+
+# 2) Prepare a simple graph
+from linkpredx.git_link_script.core.dataset_preparer import LinkPredictionDatasetPreparer, DatasetConfig
+edges = [(1,2), (2,3), (3,4), (1,4), (2,4)]
+cfg = DatasetConfig(validation_frac=0.2, cv_folds=5, random_state=42)
+prep = LinkPredictionDatasetPreparer(edges, cfg)
+
+# 3) Choose a scenario
+train_data, test_data = prep.prepare_simulation()        # or:
+# train_data, test_data = prep.prepare_discovery()
+# train_data, test_data = prep.prepare_specific(pairs=[(1,5), (2,5)])
+
+# 4) Train baselines (RF/XGB/LogReg; GNNs if enabled)
+from linkpredx.git_link_script.trainer import LinkPredictionTrainer
+trainer = LinkPredictionTrainer(train_data, test_data)
+results = trainer.run_all()   # returns metrics tables
+print(results)
+```
+
+---
+
+## 🧠 Meta-learner usage
+
+Use graph-level statistics to predict the best algorithm and expected performance (AUC / Top-K) **before** running heavy training:
+
+```python
+from linkpredx.git_link_script.graph_predictor import GraphPredictor
+from linkpredx.git_link_script.link_prediction.models import ensure_models
+
+ensure_models()  # makes sure meta_learner_models/ is populated
+gp = GraphPredictor(models_path="meta_learner_models")
+
+# Run on an edgelist file (or supply a NetworkX graph in your implementation)
+pred = gp.predict_from_graph("example_networks/facebook.edgelist")
+
+print("Best model:", pred["best_model"])
+print("Predicted AUC:", pred["auc"])
+print("Predicted Top-K:", pred["topk"])
+```
+
+---
+
+## 📂 Repository layout
+
+```
+git_link_script/
+ ├── configs/                 # YAML configs (feature toggles, etc.)
+ ├── example_networks/        # small example graphs
+ ├── Link Prediction Demo Notebook.ipynb
+ ├── link_prediction/
+ │    ├── core/               # dataset preparation & orchestration
+ │    ├── features/           # feature extraction modules
+ │    ├── models/             # pretrained model downloader (ensure_models)
+ │    ├── prediction/         # meta-learner & predictors
+ │    ├── utils/              # logging & helpers
+ ├── meta_learner_models/     # pretrained meta-learner models (downloaded here)
+ └── requirements.txt
+```
+
+---
+
+## 🤝 Contributing
+
+- Open issues for bugs or feature requests.  
+- PRs welcome (please include tests where applicable).
+
+---
+
+## 📄 License
+
+MIT License © 2025 Bisman Singh
