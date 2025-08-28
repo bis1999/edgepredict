@@ -5,7 +5,12 @@ It also includes a **meta-learner** that predicts the best-performing model for 
 
 > **Paper:** *Meta-learning optimizes predictions of missing links in real-world networks* — Bisman Singh, Lucy Van Kleunen, Aaron Clauset.  
 > arXiv: https://arxiv.org/abs/2508.09069
-> [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1emo9Q3MlAAHp0uqtYy1h8bx18M_tXKVj#scrollTo=1f0f001d-696f-408e-acb1-9435a83bda53)
+## Quick demo
+
+Launch the notebook in Google Colab:
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1emo9Q3MlAAHp0uqtYy1h8bx18M_tXKVj#scrollTo=1f0f001d-696f-408e-acb1-9435a83bda53)
+
 
 
 ---
