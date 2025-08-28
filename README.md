@@ -177,22 +177,18 @@ We support **three evaluation scenarios** matching common use cases.
 ## 🚀 Quickstart (programmatic)
 
 ```python
-# 1) Ensure pretrained models are present
-from link_prediction.models.downloader import ensure_models
-ensure_models("meta_learner_models")  # downloads + verifies
-
-# 2) Prepare a small graph (edge list)
+# 1) Prepare a small graph (edge list)
 from link_prediction.core.dataset_preparer import LinkPredictionDatasetPreparer, DatasetConfig
 edges = [(1,2), (2,3), (3,4), (1,4), (2,4)]
 cfg = DatasetConfig(validation_frac=0.2, cv_folds=5, random_state=42)
 prep = LinkPredictionDatasetPreparer(edges, cfg)
 
-# 3) Choose a scenario
+# 2) Choose a scenario
 train_data, test_data = prep.prepare_simulation()        # or:
 # train_data, test_data = prep.prepare_discovery()
 # train_data, test_data = prep.prepare_specific(pairs=[(1,5), (2,5)])
 
-# 4) Train baselines (RF/XGB/LogReg; GNNs if enabled in your setup)
+# 3) Train baselines
 from link_prediction.training.trainer import LinkPredictionTrainer
 trainer = LinkPredictionTrainer(train_data, test_data)
 results = trainer.run_all()   # returns metrics tables
@@ -206,10 +202,10 @@ print(results)
 Use graph-level statistics to predict the best algorithm and expected performance (AUC / Top-K) **before** training:
 
 ```python
+# 1) Ensure pretrained models are present
 from link_prediction.utils.graph_predictor import GraphPredictor
 from link_prediction.models.downloader import ensure_models
-
-ensure_models("meta_learner_models")
+ensure_models("meta_learner_models")  # downloads + verifies
 gp = GraphPredictor(models_path="meta_learner_models")
 
 # Example: run on an edgelist file
