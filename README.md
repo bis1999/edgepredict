@@ -8,7 +8,7 @@ It also includes a **meta-learner** that predicts the best-performing model for 
 
 ---
 
-## 📦 Dev Setup (no PyPI)
+## 📦 Dev Setup
 
 You and your users can run everything directly from a clone (no packaging needed).
 
@@ -221,7 +221,7 @@ print("Predicted Top-K:", pred["topk"])
 
 ---
 
-## 📁 Repository layout (current)
+## 📁 Repository layout 
 
 ```
 edgepredict/
@@ -242,9 +242,7 @@ edgepredict/
 └── .gitignore
 ```
 
-### Example `src/` layout (optional, for packaging later)
-
-If you later move to a canonical `src/` layout for packaging:
+### Example `src/` layout 
 
 ```
 src/
