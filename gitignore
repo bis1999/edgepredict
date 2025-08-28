@@ -1,0 +1,74 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# C extensions
+*.so
+
+# ---- Packaging / build ----
+.Python
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+sdist/
+var/
+*.egg-info/
+pip-wheel-metadata/
+.installed.cfg
+*.egg
+
+# ---- Test / coverage ----
+.coverage
+.coverage.*
+.cache/
+pytest_cache/
+.tox/
+.nox/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# ---- Editors / IDEs ----
+.vscode/
+.idea/
+*.iml
+
+# ---- Environments ----
+.env
+.venv
+venv/
+ENV/
+env/
+*.env
+.python-version
+
+# ---- Type checkers ----
+.pyre/
+.mypy_cache/
+
+# ---- OS cruft ----
+.DS_Store
+Thumbs.db
+
+# ---- Logs / tmp ----
+logs/
+*.log
+tmp/
+temp/
+
+# ---- Data (optional) ----
+data/
+datasets/
+
+# ---- Model artifacts (keep out of git; use Releases or LFS) ----
+meta_learner_models/*
+Models/*
+*.pt
+*.pth
+*.pkl
+*.joblib
